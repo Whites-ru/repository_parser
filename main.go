@@ -1,9 +1,11 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"runtime"
+	"strings"
 
 	pr "parse_repository"
 )
@@ -372,40 +374,62 @@ func Get_package_list(branch, arch string) (bool, []Package) {
 	return is_ok
 }*/
 
-func main() {
-
-	pr.Set_api_urls("https://rdb.altlinux.org/api/packageset/active_packagesets", "https://rdb.altlinux.org/api/site/all_pkgset_archs", "https://rdb.altlinux.org/api/export/branch_binary_packages")
-
+func get_help(by_error bool) {
+	if by_error {
+		fmt.Println("Invalid call parameters.")
+	}
+	fmt.Println("Available branch names:")
 	is_ok, pcs := pr.Get_package_sets()
 	if is_ok {
-		for i := 0; i < len(pcs); i++ {
-			fmt.Printf("branch name: %s \n", *pcs[i])
-		}
+		fmt.Println(strings.Join(*pcs, " "))
 	}
 
+	fmt.Println("\nAvailable archs:")
 	var archs []pr.Arch
 	is_ok, archs = pr.Get_package_set_archs("p10")
 	if is_ok {
 		for i := 0; i < len(archs); i++ {
-			fmt.Printf("arch: %s \n", archs[i].Arch)
+			fmt.Printf("%s ", archs[i].Arch)
 		}
 	}
+	fmt.Println("\n\nTo use set flags \"branch_one\", \"branch_two\" from available branch names and set flags \"arch_one\", \"arch_two\" from available archs. Or use \"help\" parameter for show help.")
+	fmt.Println("Example usage: \"-branch_one=p10 -branch_two=p9 -arch_one=x86_64 -arch_two=x86_64\"")
+}
 
-	branch_one := "p9"
-	branch_two := "p10"
-	arch_one := "x86_64"
-	arch_two := "x86_64"
+func main() {
+	if len(os.Args) < 1 {
+		get_help(true)
+		os.Exit(2)
+	}
 
-	if is_ok {
-		ok, res := pr.Get_result(branch_one, branch_two, arch_one, arch_two, runtime.NumCPU())
-		if ok {
-			out_file, err_file := os.OpenFile("result.json", os.O_CREATE|os.O_WRONLY, 0660)
-			if err_file != nil {
-				fmt.Println(err_file)
+	if pr.Set_api_urls("https://rdb.altlinux.org/api/packageset/active_packagesets",
+		"https://rdb.altlinux.org/api/site/all_pkgset_archs",
+		"https://rdb.altlinux.org/api/export/branch_binary_packages") {
+
+		if os.Args[1] == "help" {
+			get_help(false)
+		} else {
+
+			branch_one := flag.String("branch_one", "", "a string to set one branch name")
+			branch_two := flag.String("branch_two", "", "a string to set two branch name")
+			arch_one := flag.String("arch_one", "", "a string to set one arch name")
+			arch_two := flag.String("arch_two", "", "a string to set two arch name")
+
+			flag.Parse()
+
+			ok, res := pr.Get_result(*branch_one, *branch_two, *arch_one, *arch_two, runtime.NumCPU())
+			if ok {
+				out_file, err_file := os.OpenFile("result.json", os.O_CREATE|os.O_WRONLY, 0660)
+				if err_file != nil {
+					fmt.Println(err_file)
+				} else {
+					defer out_file.Close()
+					out_file.Write(res)
+				}
 			} else {
-				defer out_file.Close()
-				out_file.Write(res)
+				get_help(true)
 			}
 		}
+
 	}
 }

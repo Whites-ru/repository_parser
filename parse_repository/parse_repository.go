@@ -13,7 +13,7 @@ import (
 
 type Packagesets struct {
 	Length      int64
-	Packagesets []*string
+	Packagesets *[]string
 }
 
 type Arch struct {
@@ -108,15 +108,20 @@ func (rv *Result_versions) add_packages_with_hight_version(pck Package) {
 	rv.Packages_with_hight_version = append(rv.Packages_with_hight_version, pck)
 }
 
-func Set_api_urls(active_packagesets, all_pkgset_archs, package_list string) {
-	active_packagesets_url = active_packagesets
-	all_pkgset_archs_url = all_pkgset_archs
-	package_list_url = package_list
+func Set_api_urls(active_packagesets, all_pkgset_archs, package_list string) bool {
+	res := false
+	if len(strings.TrimSpace(active_packagesets)) > 0 && len(strings.TrimSpace(all_pkgset_archs)) > 0 && len(strings.TrimSpace(package_list)) > 0 {
+		active_packagesets_url = active_packagesets
+		all_pkgset_archs_url = all_pkgset_archs
+		package_list_url = package_list
+		res = true
+	}
+	return res
 }
 
-func Get_package_sets() (bool, []*string) {
+func Get_package_sets() (bool, *[]string) {
 	is_ok := false
-	var res []*string
+	var res *[]string
 
 	if len(strings.TrimSpace(active_packagesets_url)) > 0 {
 
