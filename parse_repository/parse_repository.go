@@ -74,9 +74,9 @@ type Result_in_one_and_two struct {
 }
 
 var (
-	active_packagesets_url string // = "https://rdb.altlinux.org/api/packageset/active_packagesets"
-	all_pkgset_archs_url   string // = "https://rdb.altlinux.org/api/site/all_pkgset_archs"
-	package_list_url       string // = "https://rdb.altlinux.org/api/export/branch_binary_packages"
+	active_packagesets_url string
+	all_pkgset_archs_url   string
+	package_list_url       string
 
 	pcl_1                 []Package
 	pcl_2                 []Package
@@ -111,9 +111,9 @@ func (rv *Result_versions) add_packages_with_hight_version(pck Package) {
 func Set_api_urls(active_packagesets, all_pkgset_archs, package_list string) bool {
 	res := false
 	if len(strings.TrimSpace(active_packagesets)) > 0 && len(strings.TrimSpace(all_pkgset_archs)) > 0 && len(strings.TrimSpace(package_list)) > 0 {
-		active_packagesets_url = active_packagesets
-		all_pkgset_archs_url = all_pkgset_archs
-		package_list_url = package_list
+		active_packagesets_url = strings.TrimSpace(active_packagesets)
+		all_pkgset_archs_url = strings.TrimSpace(all_pkgset_archs)
+		package_list_url = strings.TrimSpace(package_list)
 		res = true
 	}
 	return res
@@ -227,7 +227,6 @@ func find_packages_vers(n_start, n_end, n2 int) {
 	var ver_arr []string
 	var err, err2 error
 
-	fmt.Println("exec n_start=" + strconv.Itoa(n_start) + " n_end=" + strconv.Itoa(n_end) + "....")
 	for i := n_start; i < n_end; i++ {
 		ver_arr = strings.Split(result_in_one_and_two.Packages[i].Version, ".")
 		ver_maj_1, err = strconv.ParseInt(ver_arr[0], 10, 64)
@@ -261,7 +260,6 @@ func find_packages_vers(n_start, n_end, n2 int) {
 					if result_in_one_and_two.Packages[i].Name == pcl_2[j].Name && ver_maj_1 > ver_maj_2 &&
 						((ver_min_1 > 0 && ver_min_2 > 0 && ver_min_1 > ver_min_2) || (ver_min_1 == 0 && ver_min_2 == 0)) &&
 						((ver_rel_1 > 0 && ver_rel_2 > 0 && ver_rel_1 > ver_rel_2) || (ver_rel_1 == 0 && ver_rel_2 == 0)) {
-						fmt.Printf("Name 1 highter: %s ver1=%s ver2=%s \n", result_in_one_and_two.Packages[i].Name, result_in_one_and_two.Packages[i].Version, pcl_2[j].Version)
 						pck := result_in_one_and_two.Packages[i]
 						result_versions.add_packages_with_hight_version(pck)
 						break
@@ -271,7 +269,6 @@ func find_packages_vers(n_start, n_end, n2 int) {
 		}
 	}
 	wg2.Done()
-	fmt.Println("exec ok n_start=" + strconv.Itoa(n_start) + " n_end=" + strconv.Itoa(n_end))
 }
 
 func Find_packages(operation int) bool {
@@ -368,12 +365,13 @@ func Get_result(branch_one, branch_two, arch_one, arch_two string, thread_count 
 	is_ok := false
 	var is_ok_1, is_ok_2 bool = false, false
 
-	if len(strings.TrimSpace(branch_one)) > 0 && len(strings.TrimSpace(branch_two)) > 0 && len(strings.TrimSpace(arch_one)) > 0 && len(strings.TrimSpace(arch_two)) > 0 {
+	if len(branch_one) > 0 && len(branch_two) > 0 && len(arch_one) > 0 && len(arch_two) > 0 {
 
 		is_ok_1, pcl_1 = Get_package_list(branch_one, arch_one)
 		is_ok_2, pcl_2 = Get_package_list(branch_two, arch_two)
 
 		if is_ok_1 && is_ok_2 {
+			fmt.Println("[] Start processing with parameters branch_one=\"" + branch_one + "\", arch_one=\"" + arch_one + "\", branch_two=\"" + branch_two + "\", arch_two=\"" + arch_two + "\"...")
 
 			if thread_count > 0 {
 				threads_count = thread_count
