@@ -31,7 +31,8 @@ Starting in the working mode of parsing is carried out with the indication of fl
 - *thread_count* - the number of threads used for parsing. If the flag is not set, the number of threads will be used equal to the number of processors (virtual) in the system.
 
 ### Additional info
-The program is written in the Go language using only a standard library and can be assembled for all architectures and operating systems supported by the Go language.
+The program is written in the Go language using a standard library and *github.com/hashicorp/go-version* library. 
+Appplication can be assembled for all architectures and operating systems supported by the Go language.
 
 Examples for building a program:
 1) for Windows operating systems: *go build -ldflags = "-w -s" -o parse_repository.exe*

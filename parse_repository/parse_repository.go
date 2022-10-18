@@ -6,9 +6,10 @@ import (
 	"math"
 	"net/http"
 	"runtime"
-	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/hashicorp/go-version"
 )
 
 type Packagesets struct {
@@ -222,44 +223,17 @@ func Get_package_list(branch, arch string) (bool, []Package) {
 }
 
 func find_packages_vers(n_start, n_end, n2 int) {
-	var ver_maj_1, ver_min_1, ver_rel_1, ver_maj_2, ver_min_2, ver_rel_2 int64 = 0, 0, 0, 0, 0, 0
-
-	var ver_arr []string
-	var err, err2 error
-
 	for i := n_start; i < n_end; i++ {
-		ver_arr = strings.Split(result_in_one_and_two.Packages[i].Version, ".")
-		ver_maj_1, err = strconv.ParseInt(ver_arr[0], 10, 64)
-		if err == nil {
-			if len(ver_arr) > 1 {
-				ver_min_1, err = strconv.ParseInt(ver_arr[1], 10, 64)
-				if err == nil {
-					if len(ver_arr) >= 3 {
-						ver_rel_1, err = strconv.ParseInt(ver_arr[2], 10, 64)
-					}
-				}
-			}
-		}
+		v1, err := version.NewVersion(result_in_one_and_two.Packages[i].Version)
 		if err == nil {
 			for j := 0; j < n2; j++ {
-				ver_arr = strings.Split(pcl_2[j].Version, ".")
-				ver_maj_2, err2 = strconv.ParseInt(ver_arr[0], 10, 64)
-				if err2 == nil {
-					if len(ver_arr) > 1 {
-						ver_min_2, err2 = strconv.ParseInt(ver_arr[1], 10, 64)
-						if err2 == nil {
-							if len(ver_arr) >= 3 {
-								ver_rel_2, err2 = strconv.ParseInt(ver_arr[2], 10, 64)
-							}
-						}
-					}
-				}
+
+				v2, err2 := version.NewVersion(pcl_2[j].Version)
 
 				if err2 == nil {
 
-					if result_in_one_and_two.Packages[i].Name == pcl_2[j].Name && ver_maj_1 > ver_maj_2 &&
-						((ver_min_1 > 0 && ver_min_2 > 0 && ver_min_1 > ver_min_2) || (ver_min_1 == 0 && ver_min_2 == 0)) &&
-						((ver_rel_1 > 0 && ver_rel_2 > 0 && ver_rel_1 > ver_rel_2) || (ver_rel_1 == 0 && ver_rel_2 == 0)) {
+					if result_in_one_and_two.Packages[i].Name == pcl_2[j].Name &&
+						v1.GreaterThan(v2) {
 						pck := result_in_one_and_two.Packages[i]
 						result_versions.add_packages_with_hight_version(pck)
 						break
