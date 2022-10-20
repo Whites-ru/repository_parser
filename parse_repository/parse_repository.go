@@ -6,10 +6,17 @@ import (
 	"math"
 	"net/http"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
-	"github.com/hashicorp/go-version"
+	//sv "github.com/Masterminds/semver/v3"
+	//sv "github.com/blang/semver/v4"
+	//"github.com/hashicorp/go-version"
+	sv "github.com/knqyf263/go-rpm-version"
+	sl "golang.org/x/exp/slices"
 )
 
 type Packagesets struct {
@@ -49,13 +56,13 @@ type Response struct {
 }
 
 type Result struct {
-	Branch_one                  string
-	Branch_two                  string
-	Arch_one                    string
-	Arch_two                    string
-	Packages_not_in_two         *[]Package
-	Packages_not_in_one         *[]Package
-	Packages_with_hight_version *[]Package
+	Branch_one                  string     `json:"branch_one"`
+	Branch_two                  string     `json:"branch_two"`
+	Arch_one                    string     `json:"arch_one"`
+	Arch_two                    string     `json:"arch_two"`
+	Packages_not_in_two         *[]Package `json:"packages_not_in_two"`
+	Packages_not_in_one         *[]Package `json:"packages_not_in_one"`
+	Packages_with_hight_version *[]Package `json:"packages_with_hight_version"`
 }
 
 type Result_versions struct {
@@ -79,16 +86,20 @@ var (
 	all_pkgset_archs_url   string
 	package_list_url       string
 
-	pcl_1                 []Package
-	pcl_2                 []Package
-	result_arr            Result
-	result_not_in_two     Result_not_in_two
-	result_not_in_one     Result_not_in_one
-	result_in_one_and_two Result_in_one_and_two
-	result_versions       Result_versions
-	wg                    sync.WaitGroup
-	wg2                   sync.WaitGroup
-	threads_count         int
+	pcl_1             []Package
+	pcl_2             []Package
+	result_arr        Result
+	result_not_in_two Result_not_in_two
+	result_not_in_one Result_not_in_one
+	result_in_one     Result_in_one_and_two
+	result_in_two     Result_in_one_and_two
+	result_versions   Result_versions
+	wg                sync.WaitGroup
+	wg2               sync.WaitGroup
+	threads_count     int
+
+	package_found       []string
+	package_found_store atomic.Value
 )
 
 func (r *Result_not_in_two) add_packages_not_in_two(pck Package) {
@@ -103,10 +114,10 @@ func (r *Result_in_one_and_two) add_package(pck Package) {
 	r.Packages = append(r.Packages, pck)
 }
 
-func (rv *Result_versions) add_packages_with_hight_version(pck Package) {
+func (rv *Result_versions) add_packages_with_hight_version(pck []Package) {
 	rv.mu.Lock()
 	defer rv.mu.Unlock()
-	rv.Packages_with_hight_version = append(rv.Packages_with_hight_version, pck)
+	rv.Packages_with_hight_version = append(rv.Packages_with_hight_version, pck...)
 }
 
 func Set_api_urls(active_packagesets, all_pkgset_archs, package_list string) bool {
@@ -222,34 +233,156 @@ func Get_package_list(branch, arch string) (bool, []Package) {
 	return is_ok, res
 }
 
+func Get_package_found() []string {
+	val := package_found_store.Load()
+	if val == nil {
+		return []string{}
+	}
+	return val.([]string)
+}
+
 func find_packages_vers(n_start, n_end, n2 int) {
+	fmt.Println("thread n_start=" + strconv.Itoa(n_start) + " n_end=" + strconv.Itoa(n_end) + " is start at " + time.Now().Local().String())
+	var pkgs []Package
 	for i := n_start; i < n_end; i++ {
-		v1, err := version.NewVersion(result_in_one_and_two.Packages[i].Version)
+
+		// //github.com/hashicorp/go-version
+		// v1, err := version.NewVersion(result_in_one.Packages[i].Version)
+		// if err == nil {
+		// 	for j := 0; j < n2; j++ {
+
+		// 		if Get_package_found() == nil || !sl.Contains(Get_package_found(), result_in_one.Packages[i].Name) {
+		// 			v2, err2 := version.NewVersion(result_in_two.Packages[j].Version)
+
+		// 			if err2 == nil {
+
+		// 				if result_in_one.Packages[i].Name == result_in_two.Packages[j].Name && v1.GreaterThan(v2) {
+		// 					pck := result_in_one.Packages[i]
+		// 					//result_versions.add_packages_with_hight_version(pck)
+
+		// 					pkgs = append(pkgs, pck)
+
+		// 					package_found_store.Store(append(package_found, pck.Name))
+
+		// 					break
+		// 				}
+		// 			} else {
+		// 				fmt.Print("err2: ")
+		// 				fmt.Println(err2)
+		// 			}
+		// 		}
+		// 	}
+		// } else {
+		// 	fmt.Print("err1: ")
+		// 	fmt.Println(err)
+		// }
+
+		// //https://github.com/Masterminds/semver
+		// v1, err := sv.NewVersion(result_in_one.Packages[i].Version)
+		// if err == nil {
+		// 	for j := 0; j < n2; j++ {
+
+		// 		if Get_package_found() == nil || !sl.Contains(Get_package_found(), result_in_one.Packages[i].Name) {
+		// 			v2, err2 := sv.NewVersion(result_in_two.Packages[j].Version)
+
+		// 			if err2 == nil {
+
+		// 				if result_in_one.Packages[i].Name == result_in_two.Packages[j].Name && v1.GreaterThan(v2) {
+		// 					pck := result_in_one.Packages[i]
+		// 					//result_versions.add_packages_with_hight_version(pck)
+
+		// 					pkgs = append(pkgs, pck)
+
+		// 					package_found_store.Store(append(package_found, pck.Name))
+
+		// 					break
+		// 				}
+		// 			} else {
+		// 				fmt.Print("err2: ")
+		// 				fmt.Println(err2)
+		// 			}
+		// 		}
+		// 	}
+		// } else {
+		// 	fmt.Print("err1: ")
+		// 	fmt.Println(err)
+		// }
+
+		//golang.org/x/exp/slices
+		// for j := 0; j < n2; j++ {
+
+		// 	if Get_package_found() == nil || !sl.Contains(Get_package_found(), result_in_one.Packages[i].Name) {
+
+		// 		if result_in_one.Packages[i].Name == result_in_two.Packages[j].Name && sv.Compare("v"+result_in_one.Packages[i].Version, "v"+result_in_two.Packages[i].Version) == +1 {
+		// 			pck := result_in_one.Packages[i]
+		// 			//result_versions.add_packages_with_hight_version(pck)
+
+		// 			pkgs = append(pkgs, pck)
+
+		// 			package_found_store.Store(append(package_found, pck.Name))
+
+		// 			break
+		// 		}
+
+		// 	}
+		// }
+
+		//github.com/blang/semver/v4
+		/*v1, err := sv.New(result_in_one.Packages[i].Version)
 		if err == nil {
 			for j := 0; j < n2; j++ {
 
-				v2, err2 := version.NewVersion(pcl_2[j].Version)
+				if Get_package_found() == nil || !sl.Contains(Get_package_found(), result_in_one.Packages[i].Name) {
+					v2, err2 := sv.New(result_in_two.Packages[j].Version)
 
-				if err2 == nil {
+					if err2 == nil {
 
-					if result_in_one_and_two.Packages[i].Name == pcl_2[j].Name &&
-						v1.GreaterThan(v2) {
-						pck := result_in_one_and_two.Packages[i]
-						result_versions.add_packages_with_hight_version(pck)
-						break
+						if result_in_one.Packages[i].Name == result_in_two.Packages[j].Name && v1.Compare(*v2) == 1 {
+							pck := result_in_one.Packages[i]
+							//result_versions.add_packages_with_hight_version(pck)
+
+							pkgs = append(pkgs, pck)
+
+							package_found_store.Store(append(package_found, pck.Name))
+
+							break
+						}
 					}
 				}
 			}
+		}*/
+
+		//github.com/knqyf263/go-rpm-version
+		v1 := sv.NewVersion(result_in_one.Packages[i].Version)
+		//fmt.Println(v1.Version())
+		for j := 0; j < n2; j++ {
+
+			if Get_package_found() == nil || !sl.Contains(Get_package_found(), result_in_one.Packages[i].Name) {
+				v2 := sv.NewVersion(result_in_two.Packages[j].Version)
+				//fmt.Println(v2.Version())
+				if result_in_one.Packages[i].Name == result_in_two.Packages[j].Name && v1.GreaterThan(v2) {
+					pck := result_in_one.Packages[i]
+					//result_versions.add_packages_with_hight_version(pck)
+
+					pkgs = append(pkgs, pck)
+
+					package_found_store.Store(append(package_found, pck.Name))
+
+					break
+				}
+
+			}
 		}
+
 	}
+	result_versions.add_packages_with_hight_version(pkgs)
+
+	fmt.Println("thread n_start=" + strconv.Itoa(n_start) + " n_end=" + strconv.Itoa(n_end) + " is END at " + time.Now().Local().String())
 	wg2.Done()
 }
 
-func Find_packages(operation int) bool {
-	is_ok := false
-
+func Find_packages(operation int) {
 	is_find := false
-	n := 0
 
 	pcl_1_len := len(pcl_1)
 	pcl_2_len := len(pcl_2)
@@ -267,14 +400,12 @@ func Find_packages(operation int) bool {
 			}
 			if !is_find {
 				result_not_in_two.add_packages_not_in_two(pcl_1[i])
-				n++
 			}
 		}
 
 		/*все пакеты, которые есть в 2-й но нет во 1-й*/
 	} else if operation == 2 {
 		is_find = false
-		n = 0
 		for i := 0; i < pcl_2_len; i++ {
 			is_find = false
 			for j := 0; j < pcl_1_len; j++ {
@@ -286,21 +417,16 @@ func Find_packages(operation int) bool {
 			}
 			if !is_find {
 				result_not_in_one.add_packages_not_in_one(pcl_2[i])
-				n++
 			}
 		}
 		/*все пакеты, которые есть в 1-й и во 2-й*/
 	} else if operation == 3 {
-		//is_find = false
-		n = 0
 		for i := 0; i < pcl_1_len; i++ {
-			//is_find = false
 			for j := 0; j < pcl_2_len; j++ {
 
 				if pcl_1[i].Name == pcl_2[j].Name {
-					//is_find = true
-					result_in_one_and_two.add_package(pcl_1[i])
-					n++
+					result_in_one.add_package(pcl_1[i])
+					result_in_two.add_package(pcl_2[j])
 					break
 				}
 			}
@@ -309,28 +435,27 @@ func Find_packages(operation int) bool {
 		/*все пакеты, version-release которых больше в 1-й чем во 2-й*/
 	} else if operation == 4 {
 		var n_start, n_end, n_go int = 0, 0, 0
-		pcl_1_len = len(result_in_one_and_two.Packages)
+		pcl_1_len = len(result_in_one.Packages)
+		pcl_2_len = len(result_in_two.Packages)
 		n_go = int(math.Floor(float64(pcl_1_len) / float64(threads_count)))
 		n_end = n_go
 		wg2.Add(threads_count)
+		fmt.Println(threads_count)
 		for i := 0; i < threads_count; i++ {
-
+			fmt.Println("thread no: " + strconv.Itoa(i) + " n_start=" + strconv.Itoa(n_start) + " n_end=" + strconv.Itoa(n_end))
 			go find_packages_vers(n_start, n_end, pcl_2_len)
+
 			n_start = n_start + n_go
 			n_end = n_end + n_go
 		}
 		wg2.Wait()
-		n++
 	}
-	if n > 0 {
-		is_ok = true
-		if operation == 3 {
-			Find_packages(4)
-		} else {
-			wg.Done()
-		}
+
+	if operation == 3 {
+		Find_packages(4)
+	} else {
+		wg.Done()
 	}
-	return is_ok
 }
 
 func Get_result(branch_one, branch_two, arch_one, arch_two string, thread_count int) (bool, []byte) {
@@ -366,6 +491,8 @@ func Get_result(branch_one, branch_two, arch_one, arch_two string, thread_count 
 			result_arr.Packages_not_in_one = &result_not_in_one.Packages_not_in_one
 			result_arr.Packages_not_in_two = &result_not_in_two.Packages_not_in_two
 			result_arr.Packages_with_hight_version = &result_versions.Packages_with_hight_version
+
+			fmt.Println("len vers=" + strconv.Itoa(len(result_versions.Packages_with_hight_version)))
 
 			res, err = json.Marshal(result_arr)
 			if err == nil {
